@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Risk Analytics in Banking Domain — Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #1e2d45;
+    --accent-blue: #2563eb;
+    --accent-cyan: #06b6d4;
+    --accent-green: #10b981;
+    --accent-amber: #f59e0b;
+    --accent-red: #ef4444;
+    --accent-purple: #8b5cf6;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #475569;
+    --low: #10b981;
+    --medium: #f59e0b;
+    --high: #ef4444;
+    --grid: #1e2d45;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+  }
+
+  /* === HEADER === */
+  .header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f1f3d 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .bank-logo {
+    width: 44px; height: 44px;
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  .header-title { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+  .header-subtitle { font-size: 12px; color: var(--text-secondary); font-family: 'IBM Plex Mono', monospace; }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .status-pill {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: #10b981;
+    font-size: 11px;
+    font-family: 'IBM Plex Mono', monospace;
+    padding: 4px 12px;
+    border-radius: 20px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #10b981; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* === NAV TABS === */
+  .nav-tabs {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    padding: 0 32px;
+    gap: 4px;
+    overflow-x: auto;
+  }
+  .nav-tab {
+    padding: 14px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border: none;
+    background: none;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: all 0.2s;
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+  .nav-tab:hover { color: var(--text-primary); }
+  .nav-tab.active {
+    color: var(--accent-cyan);
+    border-bottom-color: var(--accent-cyan);
+  }
+  .tab-icon { margin-right: 6px; }
+
+  /* === MAIN CONTENT === */
+  .main { padding: 28px 32px; max-width: 1600px; margin: 0 auto; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  .section-header {
+    display: flex; align-items: baseline; gap: 12px;
+    margin-bottom: 24px;
+  }
+  .section-title { font-size: 22px; font-weight: 700; }
+  .section-sub { font-size: 13px; color: var(--text-secondary); font-family: 'IBM Plex Mono', monospace; }
+
+  /* === KPI CARDS === */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); border-color: var(--accent-cyan); }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan));
+  }
+  .kpi-card.red::before { background: linear-gradient(90deg, #dc2626, #ef4444); }
+  .kpi-card.green::before { background: linear-gradient(90deg, #059669, #10b981); }
+  .kpi-card.amber::before { background: linear-gradient(90deg, #d97706, #f59e0b); }
+  .kpi-card.purple::before { background: linear-gradient(90deg, #7c3aed, #8b5cf6); }
+  .kpi-label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
+  .kpi-value { font-size: 28px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; line-height: 1; }
+  .kpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+  .kpi-icon { position: absolute; top: 18px; right: 18px; font-size: 22px; opacity: 0.2; }
+
+  /* === CHART GRID === */
+  .chart-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  .chart-grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px;
+  }
+  .chart-card.full { grid-column: 1 / -1; }
+  .chart-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    margin-bottom: 18px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .chart-title::before {
+    content: '';
+    width: 3px; height: 14px;
+    background: var(--accent-cyan);
+    border-radius: 2px;
+  }
+  .chart-container { position: relative; }
+
+  /* === TABLE === */
+  .risk-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .risk-table th {
+    text-align: left;
+    padding: 10px 14px;
+    color: var(--text-secondary);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+  }
+  .risk-table td {
+    padding: 11px 14px;
+    border-bottom: 1px solid rgba(30,45,69,0.5);
+    color: var(--text-primary);
+  }
+  .risk-table tr:last-child td { border-bottom: none; }
+  .risk-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .rank-num { color: var(--text-muted); font-family: 'IBM Plex Mono', monospace; }
+  .font-mono { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--accent-cyan); }
+  .risk-score-pill {
+    background: rgba(239,68,68,0.15);
+    border: 1px solid rgba(239,68,68,0.3);
+    color: #ef4444;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 12px;
+  }
+  .badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 10px;
+  }
+  .badge-danger { background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+  .badge-success { background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+
+  /* === INSIGHT BOXES === */
+  .insights-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin-top: 20px;
+  }
+  .insight-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    border-left: 3px solid var(--accent-cyan);
+  }
+  .insight-box.red { border-left-color: var(--high); }
+  .insight-box.green { border-left-color: var(--low); }
+  .insight-box.amber { border-left-color: var(--medium); }
+  .insight-label { font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .insight-value { font-size: 20px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
+  .insight-desc { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+  /* === FOOTER === */
+  .footer {
+    text-align: center;
+    padding: 24px 32px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    border-top: 1px solid var(--border);
+    margin-top: 40px;
+  }
+
+  @media (max-width: 900px) {
+    .chart-grid-2 { grid-template-columns: 1fr; }
+    .chart-grid-3 { grid-template-columns: 1fr; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .main { padding: 16px; }
+    .header { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="header">
+  <div class="header-left">
+    <div class="bank-logo">🏦</div>
+    <div>
+      <div class="header-title">Risk Analytics Dashboard</div>
+      <div class="header-subtitle">Banking Domain · Airflow · Databricks · PySpark · Delta Lake · MySQL</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill">
+      <span class="status-dot"></span>
+      LIVE · 20,099 RECORDS
+    </div>
+  </div>
+</header>
+
+<!-- ===== NAV TABS ===== -->
+<nav class="nav-tabs">
+  <button class="nav-tab active" onclick="showPage('p1',this)"><span class="tab-icon">📊</span>Executive Summary</button>
+  <button class="nav-tab" onclick="showPage('p2',this)"><span class="tab-icon">⚠️</span>Loan Default Analytics</button>
+  <button class="nav-tab" onclick="showPage('p3',this)"><span class="tab-icon">👤</span>Customer Risk Score</button>
+  <button class="nav-tab" onclick="showPage('p4',this)"><span class="tab-icon">💰</span>Financial Risk Insights</button>
+</nav>
+
+<!-- ===== MAIN ===== -->
+<main class="main">
+
+<!-- ======================================================= -->
+<!-- PAGE 1: EXECUTIVE SUMMARY                               -->
+<!-- ======================================================= -->
+<div id="p1" class="page active">
+  <div class="section-header">
+    <div class="section-title">Executive Summary</div>
+    <div class="section-sub">// Portfolio Health Overview</div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-icon">📋</div>
+      <div class="kpi-label">Total Customers</div>
+      <div class="kpi-value">20,099</div>
+      <div class="kpi-sub">Loan applications</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-icon">❌</div>
+      <div class="kpi-label">Total Defaults</div>
+      <div class="kpi-value" style="color:var(--high)">2,322</div>
+      <div class="kpi-sub">Defaulted accounts</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-icon">📉</div>
+      <div class="kpi-label">Default Rate</div>
+      <div class="kpi-value" style="color:var(--high)">11.55%</div>
+      <div class="kpi-sub">Of total portfolio</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">💵</div>
+      <div class="kpi-label">Avg Loan Amount</div>
+      <div class="kpi-value">$127K</div>
+      <div class="kpi-sub">Per application</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-icon">⭐</div>
+      <div class="kpi-label">Avg Credit Score</div>
+      <div class="kpi-value" style="color:var(--medium)">576</div>
+      <div class="kpi-sub">Out of 850</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-icon">📈</div>
+      <div class="kpi-label">Avg Interest Rate</div>
+      <div class="kpi-value" style="color:var(--medium)">13.49%</div>
+      <div class="kpi-sub">Portfolio average</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-icon">🚨</div>
+      <div class="kpi-label">High Risk Customers</div>
+      <div class="kpi-value" style="color:var(--high)">2,475</div>
+      <div class="kpi-sub">Score &gt; 70</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-icon">🎯</div>
+      <div class="kpi-label">Avg Risk Score</div>
+      <div class="kpi-value" style="color:var(--medium)">53.53</div>
+      <div class="kpi-sub">Scale: 0–100</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-icon">✅</div>
+      <div class="kpi-label">Low Risk Customers</div>
+      <div class="kpi-value" style="color:var(--low)">3,492</div>
+      <div class="kpi-sub">Score ≤ 40</div>
+    </div>
+  </div>
+
+  <!-- Charts Row 1 -->
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Risk Category Distribution</div>
+      <div class="chart-container" style="height:260px">
+        <canvas id="c1_donut"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Default Rate by Loan Purpose</div>
+      <div class="chart-container" style="height:260px">
+        <canvas id="c1_purpose"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Row 2 -->
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Default Rate by Employment Type</div>
+      <div class="chart-container" style="height:240px">
+        <canvas id="c1_emp"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Avg Loan Amount by Risk Category</div>
+      <div class="chart-container" style="height:240px">
+        <canvas id="c1_loan_risk"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="insights-row">
+    <div class="insight-box red">
+      <div class="insight-label">Highest Default Rate</div>
+      <div class="insight-value" style="color:var(--high)">Unemployed</div>
+      <div class="insight-desc">13.69% default rate</div>
+    </div>
+    <div class="insight-box amber">
+      <div class="insight-label">Riskiest Loan Purpose</div>
+      <div class="insight-value" style="color:var(--medium)">Business</div>
+      <div class="insight-desc">12.45% default rate</div>
+    </div>
+    <div class="insight-box green">
+      <div class="insight-label">Safest Loan Purpose</div>
+      <div class="insight-value" style="color:var(--low)">Home</div>
+      <div class="insight-desc">10.78% default rate</div>
+    </div>
+    <div class="insight-box">
+      <div class="insight-label">Medium Risk Majority</div>
+      <div class="insight-value" style="color:var(--accent-cyan)">70.3%</div>
+      <div class="insight-desc">14,132 customers</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ======================================================= -->
+<!-- PAGE 2: LOAN DEFAULT ANALYTICS                          -->
+<!-- ======================================================= -->
+<div id="p2" class="page">
+  <div class="section-header">
+    <div class="section-title">Loan Default Analytics</div>
+    <div class="section-sub">// Default Drivers & Risk Factors</div>
+  </div>
+
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Default Rate by Loan Purpose (%)</div>
+      <div class="chart-container" style="height:260px">
+        <canvas id="c2_purpose_rate"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Default Rate by Employment Type (%)</div>
+      <div class="chart-container" style="height:260px">
+        <canvas id="c2_emp_rate"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Total Loans vs Defaults by Purpose</div>
+      <div class="chart-container" style="height:240px">
+        <canvas id="c2_loans_defaults"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Total Customers by Employment Type</div>
+      <div class="chart-container" style="height:240px">
+        <canvas id="c2_emp_total"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Avg Interest Rate by Risk Category (%)</div>
+      <div class="chart-container" style="height:220px">
+        <canvas id="c2_ir_risk"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Avg Income by Risk Category ($)</div>
+      <div class="chart-container" style="height:220px">
+        <canvas id="c2_income_risk"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="insights-row">
+    <div class="insight-box red">
+      <div class="insight-label">Unemployed Default Rate</div>
+      <div class="insight-value" style="color:var(--high)">13.69%</div>
+      <div class="insight-desc">Highest employment risk segment</div>
+    </div>
+    <div class="insight-box green">
+      <div class="insight-label">Full-time Default Rate</div>
+      <div class="insight-value" style="color:var(--low)">9.69%</div>
+      <div class="insight-desc">Lowest employment risk segment</div>
+    </div>
+    <div class="insight-box amber">
+      <div class="insight-label">Business Loan Default</div>
+      <div class="insight-value" style="color:var(--medium)">12.45%</div>
+      <div class="insight-desc">503 defaults out of 4,040</div>
+    </div>
+    <div class="insight-box">
+      <div class="insight-label">Home Loan Default</div>
+      <div class="insight-value" style="color:var(--low)">10.78%</div>
+      <div class="insight-desc">Lowest among all purposes</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ======================================================= -->
+<!-- PAGE 3: CUSTOMER RISK SCORE                             -->
+<!-- ======================================================= -->
+<div id="p3" class="page">
+  <div class="section-header">
+    <div class="section-title">Customer Risk Score Analysis</div>
+    <div class="section-sub">// Risk Segmentation & Top Risk Customers</div>
+  </div>
+
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Risk Category Distribution</div>
+      <div class="chart-container" style="height:260px">
+        <canvas id="c3_risk_dist"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Credit Score Range vs Risk Category</div>
+      <div class="chart-container" style="height:260px">
+        <canvas id="c3_cs_risk"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Risk Distribution by Age Group</div>
+      <div class="chart-container" style="height:240px">
+        <canvas id="c3_age_risk"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Avg Loan Amount by Risk Category ($)</div>
+      <div class="chart-container" style="height:240px">
+        <canvas id="c3_loan_cat"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-card full">
+    <div class="chart-title">Top 10 Highest Risk Customers</div>
+    <table class="risk-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Loan ID</th>
+          <th>Age</th>
+          <th>Income</th>
+          <th>Loan Amount</th>
+          <th>Credit Score</th>
+          <th>Risk Score</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+        <tr>
+            <td><span class="rank-num">#1</span></td>
+            <td class="font-mono text-sm">G7MAUB2C2B</td>
+            <td>27</td>
+            <td>$18,305</td>
+            <td>$224,789</td>
+            <td>322</td>
+            <td><span class="risk-score-pill">100.0</span></td>
+            <td><span class="badge badge-danger">Defaulted</span></td>
+        </tr>
+        <tr>
+            <td><span class="rank-num">#2</span></td>
+            <td class="font-mono text-sm">BT962AXUV7</td>
+            <td>39</td>
+            <td>$18,623</td>
+            <td>$245,617</td>
+            <td>325</td>
+            <td><span class="risk-score-pill">96.36</span></td>
+            <td><span class="badge badge-danger">Defaulted</span></td>
+        </tr>
+        <tr>
+            <td><span class="rank-num">#3</span></td>
+            <td class="font-mono text-sm">OJUH87ONYJ</td>
+            <td>65</td>
+            <td>$15,038</td>
+            <td>$197,023</td>
+            <td>302</td>
+            <td><span class="risk-score-pill">95.79</span></td>
+            <td><span class="badge badge-danger">Defaulted</span></td>
+        </tr>
+        <tr>
+            <td><span class="rank-num">#4</span></td>
+            <td class="font-mono text-sm">DZ6RTKW1R8</td>
+            <td>60</td>
+            <td>$15,215</td>
+            <td>$243,748</td>
+            <td>321</td>
+            <td><span class="risk-score-pill">95.71</span></td>
+            <td><span class="badge badge-danger">Defaulted</span></td>
+        </tr>
+        <tr>
+            <td><span class="rank-num">#5</span></td>
+            <td class="font-mono text-sm">FMUEE002VN</td>
+            <td>54</td>
+            <td>$20,848</td>
+            <td>$237,317</td>
+            <td>355</td>
+            <td><span class="risk-score-pill">94.63</span></td>
+            <td><span class="badge badge-success">Active</span></td>
+        </tr>
+        <tr>
+            <td><span class="rank-num">#6</span></td>
+            <td class="font-mono text-sm">A1CA1W8EI8</td>
+            <td>65</td>
+            <td>$20,331</td>
+            <td>$245,526</td>
+            <td>343</td>
+            <td><span class="risk-score-pill">94.46</span></td>
+            <td><span class="badge badge-danger">Defaulted</span></td>
+        </tr>
+        <tr>
+            <td><span class="rank-num">#7</span></td>
+            <td class="font-mono text-sm">XUZ9EQTDA9</td>
+            <td>34</td>
+            <td>$45,902</td>
+            <td>$245,802</td>
+            <td>336</td>
+            <td><span class="risk-score-pill">94.24</span></td>
+            <td><span class="badge badge-success">Active</span></td>
+        </tr>
+        <tr>
+            <td><span class="rank-num">#8</span></td>
+            <td class="font-mono text-sm">2MUHBYI7YY</td>
+            <td>61</td>
+            <td>$26,051</td>
+            <td>$196,898</td>
+            <td>367</td>
+            <td><span class="risk-score-pill">94.08</span></td>
+            <td><span class="badge badge-success">Active</span></td>
+        </tr>
+        <tr>
+            <td><span class="rank-num">#9</span></td>
+            <td class="font-mono text-sm">7YMX9G05VK</td>
+            <td>29</td>
+            <td>$36,099</td>
+            <td>$210,519</td>
+            <td>323</td>
+            <td><span class="risk-score-pill">93.92</span></td>
+            <td><span class="badge badge-success">Active</span></td>
+        </tr>
+        <tr>
+            <td><span class="rank-num">#10</span></td>
+            <td class="font-mono text-sm">NL5CCWFUN1</td>
+            <td>31</td>
+            <td>$47,156</td>
+            <td>$241,620</td>
+            <td>338</td>
+            <td><span class="risk-score-pill">93.71</span></td>
+            <td><span class="badge badge-danger">Defaulted</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="insights-row">
+    <div class="insight-box red">
+      <div class="insight-label">Max Risk Score</div>
+      <div class="insight-value" style="color:var(--high)">100.0</div>
+      <div class="insight-desc">Loan G7MAUB2C2B — Defaulted</div>
+    </div>
+    <div class="insight-box amber">
+      <div class="insight-label">Avg Risk Score</div>
+      <div class="insight-value" style="color:var(--medium)">53.53</div>
+      <div class="insight-desc">Portfolio median: 53.54</div>
+    </div>
+    <div class="insight-box">
+      <div class="insight-label">300-500 CS Range</div>
+      <div class="insight-value" style="color:var(--accent-cyan)">7,242</div>
+      <div class="insight-desc">Highest risk credit tier</div>
+    </div>
+    <div class="insight-box green">
+      <div class="insight-label">801-850 CS Range</div>
+      <div class="insight-value" style="color:var(--low)">0</div>
+      <div class="insight-desc">Zero high-risk customers</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ======================================================= -->
+<!-- PAGE 4: FINANCIAL RISK INSIGHTS                         -->
+<!-- ======================================================= -->
+<div id="p4" class="page">
+  <div class="section-header">
+    <div class="section-title">Financial Risk Insights</div>
+    <div class="section-sub">// Demographic & Financial Risk Drivers</div>
+  </div>
+
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Default Rate by Education Level (%)</div>
+      <div class="chart-container" style="height:260px">
+        <canvas id="c4_edu"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Default Rate by Marital Status (%)</div>
+      <div class="chart-container" style="height:260px">
+        <canvas id="c4_marital"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Default Rate — HasMortgage vs No Mortgage (%)</div>
+      <div class="chart-container" style="height:240px">
+        <canvas id="c4_mortgage"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Default Rate — HasCoSigner vs No CoSigner (%)</div>
+      <div class="chart-container" style="height:240px">
+        <canvas id="c4_cosigner"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-grid-3">
+    <div class="chart-card">
+      <div class="chart-title">Avg Loan by Risk Category ($K)</div>
+      <div class="chart-container" style="height:200px">
+        <canvas id="c4_loan_risk"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Avg Interest Rate by Risk (%)</div>
+      <div class="chart-container" style="height:200px">
+        <canvas id="c4_rate_risk"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Customer Count by Risk Category</div>
+      <div class="chart-container" style="height:200px">
+        <canvas id="c4_count_risk"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="insights-row">
+    <div class="insight-box red">
+      <div class="insight-label">High School Default</div>
+      <div class="insight-value" style="color:var(--high)">12.94%</div>
+      <div class="insight-desc">Highest among education levels</div>
+    </div>
+    <div class="insight-box green">
+      <div class="insight-label">PhD Default Rate</div>
+      <div class="insight-value" style="color:var(--low)">10.30%</div>
+      <div class="insight-desc">Lowest among education levels</div>
+    </div>
+    <div class="insight-box amber">
+      <div class="insight-label">Divorced Default Rate</div>
+      <div class="insight-value" style="color:var(--medium)">12.48%</div>
+      <div class="insight-desc">Highest marital risk segment</div>
+    </div>
+    <div class="insight-box">
+      <div class="insight-label">CoSigner Benefit</div>
+      <div class="insight-value" style="color:var(--accent-cyan)">-1.99%</div>
+      <div class="insight-desc">CoSigner reduces default rate</div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<footer class="footer">
+  RISK_ANALYTICS_BANKING_DASHBOARD v1.0 &nbsp;|&nbsp;
+  POWERED BY: AIRFLOW · DATABRICKS · PYSPARK · DELTA LAKE · MYSQL &nbsp;|&nbsp;
+  RECORDS: 20,099 &nbsp;|&nbsp; DEFAULTS: 2,322 &nbsp;|&nbsp; DEFAULT_RATE: 11.55%
+</footer>
+
+<script>
+// ============================================================
+// CHART.JS DEFAULTS
+// ============================================================
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.borderColor = '#1e2d45';
+Chart.defaults.font.family = "'IBM Plex Mono', monospace";
+Chart.defaults.font.size = 11;
+
+const C_HIGH   = 'rgba(239,68,68,0.85)';
+const C_MED    = 'rgba(245,158,11,0.85)';
+const C_LOW    = 'rgba(16,185,129,0.85)';
+const C_BLUE   = 'rgba(37,99,235,0.85)';
+const C_CYAN   = 'rgba(6,182,212,0.85)';
+const C_PURPLE = 'rgba(139,92,246,0.85)';
+
+const CHART_BG = 'transparent';
+
+const mkBar = (id, labels, data, colors, opts={}) => new Chart(document.getElementById(id), {
+  type: 'bar',
+  data: { labels, datasets: [{ data, backgroundColor: colors, borderRadius: 6, borderSkipped: false }] },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1a2235', borderColor: '#1e2d45', borderWidth: 1 } },
+    scales: {
+      x: { grid: { color: '#1e2d45' }, ticks: { color: '#94a3b8' } },
+      y: { grid: { color: '#1e2d45' }, ticks: { color: '#94a3b8' }, beginAtZero: true, ...opts.yOpts }
+    },
+    ...opts
+  }
+});
+
+const mkDonut = (id, labels, data, colors) => new Chart(document.getElementById(id), {
+  type: 'doughnut',
+  data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0, hoverOffset: 6 }] },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    cutout: '68%',
+    plugins: {
+      legend: { position: 'right', labels: { color: '#94a3b8', padding: 16, font: { size: 12 } } },
+      tooltip: { backgroundColor: '#1a2235', borderColor: '#1e2d45', borderWidth: 1 }
+    }
+  }
+});
+
+const mkHBar = (id, labels, data, colors, opts={}) => new Chart(document.getElementById(id), {
+  type: 'bar',
+  data: { labels, datasets: [{ data, backgroundColor: colors, borderRadius: 4 }] },
+  options: {
+    indexAxis: 'y',
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1a2235', borderColor: '#1e2d45', borderWidth: 1 } },
+    scales: {
+      x: { grid: { color: '#1e2d45' }, ticks: { color: '#94a3b8' }, beginAtZero: true },
+      y: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+    },
+    ...opts
+  }
+});
+
+const mkGrouped = (id, labels, datasets, opts={}) => new Chart(document.getElementById(id), {
+  type: 'bar',
+  data: { labels, datasets },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#94a3b8', padding: 12, font: { size: 11 } } }, tooltip: { backgroundColor: '#1a2235', borderColor: '#1e2d45', borderWidth: 1 } },
+    scales: {
+      x: { grid: { color: '#1e2d45' }, ticks: { color: '#94a3b8' }, stacked: opts.stacked || false },
+      y: { grid: { color: '#1e2d45' }, ticks: { color: '#94a3b8' }, beginAtZero: true, stacked: opts.stacked || false }
+    }
+  }
+});
+
+// ============================================================
+// PAGE 1 CHARTS
+// ============================================================
+mkDonut('c1_donut',
+  ['Low Risk (0-40)', 'Medium Risk (41-70)', 'High Risk (71-100)'],
+  [3492, 14132, 2475],
+  [C_LOW, C_MED, C_HIGH]
+);
+
+mkBar('c1_purpose',
+  ['Auto', 'Business', 'Education', 'Home', 'Other'],
+  [11.01, 12.45, 11.56, 10.78, 11.95],
+  [C_CYAN, C_HIGH, C_BLUE, C_LOW, C_MED]
+);
+
+mkHBar('c1_emp',
+  ['Full-time', 'Part-time', 'Self-employed', 'Unemployed'],
+  [9.69, 12.32, 10.57, 13.69],
+  [C_LOW, C_MED, C_CYAN, C_HIGH]
+);
+
+mkBar('c1_loan_risk',
+  ['Low Risk', 'Medium Risk', 'High Risk'],
+  [93.6, 129.0, 167.5],
+  [C_LOW, C_MED, C_HIGH]
+);
+
+// ============================================================
+// PAGE 2 CHARTS
+// ============================================================
+mkBar('c2_purpose_rate',
+  ['Auto', 'Business', 'Education', 'Home', 'Other'],
+  [11.01, 12.45, 11.56, 10.78, 11.95],
+  [C_CYAN, C_HIGH, C_BLUE, C_LOW, C_MED]
+);
+
+mkHBar('c2_emp_rate',
+  ['Full-time', 'Part-time', 'Self-employed', 'Unemployed'],
+  [9.69, 12.32, 10.57, 13.69],
+  [C_LOW, C_MED, C_CYAN, C_HIGH]
+);
+
+mkGrouped('c2_loans_defaults',
+  ['Auto', 'Business', 'Education', 'Home', 'Other'],
+  [
+    { label: 'Total Loans', data: [4007, 4040, 4039, 3953, 4060], backgroundColor: 'rgba(37,99,235,0.7)', borderRadius: 4 },
+    { label: 'Defaults',    data: [441,  503,  467,  426,  485],  backgroundColor: 'rgba(239,68,68,0.7)',  borderRadius: 4 }
+  ]
+);
+
+mkGrouped('c2_emp_total',
+  ['Full-time', 'Part-time', 'Self-employed', 'Unemployed'],
+  [
+    { label: 'Total', data: [5025, 4990, 5137, 4947], backgroundColor: 'rgba(6,182,212,0.7)', borderRadius: 4 },
+    { label: 'Defaults', data: [487, 615, 543, 677], backgroundColor: 'rgba(239,68,68,0.7)', borderRadius: 4 }
+  ]
+);
+
+mkBar('c2_ir_risk',
+  ['Low Risk', 'Medium Risk', 'High Risk'],
+  [11.26, 13.61, 15.91],
+  [C_LOW, C_MED, C_HIGH]
+);
+
+mkBar('c2_income_risk',
+  ['Low Risk', 'Medium Risk', 'High Risk'],
+  [108013, 81661, 53156],
+  [C_LOW, C_MED, C_HIGH]
+);
+
+// ============================================================
+// PAGE 3 CHARTS
+// ============================================================
+mkBar('c3_risk_dist',
+  ['Low Risk', 'Medium Risk', 'High Risk'],
+  [3492, 14132, 2475],
+  [C_LOW, C_MED, C_HIGH]
+);
+
+mkGrouped('c3_cs_risk',
+  ['300-500', '501-600', '601-700', '701-800', '801-850'],
+  [
+    { label: 'High Risk',   data: [2046, 309, 94, 12, 0],   backgroundColor: 'rgba(239,68,68,0.75)', borderRadius: 3 },
+    { label: 'Medium Risk', data: [5104, 3044, 2910, 2211, 846], backgroundColor: 'rgba(245,158,11,0.75)', borderRadius: 3 },
+    { label: 'Low Risk',    data: [92, 287, 769, 1353, 991], backgroundColor: 'rgba(16,185,129,0.75)', borderRadius: 3 }
+  ],
+  { stacked: true }
+);
+
+mkGrouped('c3_age_risk',
+  ['18-30','31-40','41-50','51-60','61+'],
+  [
+    { label: 'High Risk',   data: [561, 497, 479, 460, 435], backgroundColor: 'rgba(239,68,68,0.75)', borderRadius: 3 },
+    { label: 'Medium Risk', data: [3228,2817,2746,2620,2451], backgroundColor: 'rgba(245,158,11,0.75)', borderRadius: 3 },
+    { label: 'Low Risk',    data: [790, 716, 647, 666, 608], backgroundColor: 'rgba(16,185,129,0.75)', borderRadius: 3 }
+  ],
+  { stacked: true }
+);
+
+mkHBar('c3_loan_cat',
+  ['Low Risk', 'Medium Risk', 'High Risk'],
+  [93591, 128975, 167501],
+  [C_LOW, C_MED, C_HIGH]
+);
+
+// ============================================================
+// PAGE 4 CHARTS
+// ============================================================
+mkBar('c4_edu',
+  ["Bachelor's", 'High School', "Master's", 'PhD'],
+  [12.67, 12.94, 10.29, 10.30],
+  [C_CYAN, C_HIGH, C_BLUE, C_LOW]
+);
+
+mkBar('c4_marital',
+  ['Divorced', 'Married', 'Single'],
+  [12.48, 10.39, 11.76],
+  [C_HIGH, C_LOW, C_MED]
+);
+
+mkBar('c4_mortgage',
+  ['No Mortgage', 'Has Mortgage'],
+  [11.93, 11.17],
+  [C_HIGH, C_LOW]
+);
+
+mkBar('c4_cosigner',
+  ['No CoSigner', 'Has CoSigner'],
+  [12.55, 10.56],
+  [C_HIGH, C_LOW]
+);
+
+mkBar('c4_loan_risk',
+  ['Low Risk', 'Medium Risk', 'High Risk'],
+  [93.6, 129.0, 167.5],
+  [C_LOW, C_MED, C_HIGH]
+);
+
+mkBar('c4_rate_risk',
+  ['Low Risk', 'Medium Risk', 'High Risk'],
+  [11.26, 13.61, 15.91],
+  [C_LOW, C_MED, C_HIGH]
+);
+
+mkDonut('c4_count_risk',
+  ['Low Risk', 'Medium Risk', 'High Risk'],
+  [3492, 14132, 2475],
+  [C_LOW, C_MED, C_HIGH]
+);
+
+// ============================================================
+// PAGE NAVIGATION
+// ============================================================
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>

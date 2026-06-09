@@ -1,0 +1,189 @@
+================================================================================
+  RISK ANALYTICS IN BANKING DOMAIN — ARCHITECTURE FLOWCHART
+  Project: End-to-End Big Data Banking Risk Analytics Pipeline
+================================================================================
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  1. DATA SOURCE LAYER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ┌────────────────────────────────────────┐
+  │    Loan Default Dataset (CSV/XLSX)     │
+  │  20,099 records × 18 columns          │
+  │  Columns: LoanID, Age, Income,         │
+  │  LoanAmount, CreditScore, DTIRatio,    │
+  │  InterestRate, Default, etc.           │
+  └───────────────────┬────────────────────┘
+                      │
+                      ▼
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  2. ORCHESTRATION LAYER — Apache Airflow
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │                   Apache Airflow DAG                                   │
+  │            banking_risk_analytics_pipeline                             │
+  │            Schedule: Daily @ 02:00 UTC                                 │
+  │                                                                        │
+  │  [start_pipeline]                                                      │
+  │        │                                                               │
+  │        ▼                                                               │
+  │  [ingest_bronze_databricks] ──► [ingest_bronze_data]                  │
+  │        │                                                               │
+  │        ▼                                                               │
+  │  [process_silver_databricks] ──► [process_silver_data]                │
+  │        │                                                               │
+  │        ▼                                                               │
+  │  [create_gold_databricks] ──► [create_gold_tables]                    │
+  │        │                                                               │
+  │        ▼                                                               │
+  │  [export_to_mysql]                                                     │
+  │        │                                                               │
+  │        ▼                                                               │
+  │  [generate_dashboard_data]                                             │
+  │        │                                                               │
+  │        ▼                                                               │
+  │  [end_pipeline]                                                        │
+  └───────────────────────────────────┬────────────────────────────────────┘
+                                      │
+                                      ▼
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  3. BIG DATA PROCESSING — Databricks + PySpark + Delta Lake
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │                      MEDALLION ARCHITECTURE                              │
+  │                                                                          │
+  │  ┌─────────────────────────────────────────────────────────────────┐    │
+  │  │  BRONZE LAYER  (dbfs:/delta/banking_risk/bronze/)               │    │
+  │  │  • Read raw CSV from DBFS                                       │    │
+  │  │  • Add ingestion_timestamp & source_file columns                │    │
+  │  │  • Store as Delta table: bronze_loan_default                    │    │
+  │  │  • Schema preserved (18 cols + 2 metadata)                     │    │
+  │  └─────────────────────────────┬───────────────────────────────────┘    │
+  │                                │                                         │
+  │                     ETL / TRANSFORM                                      │
+  │                                │                                         │
+  │  ┌─────────────────────────────▼───────────────────────────────────┐    │
+  │  │  SILVER LAYER  (dbfs:/delta/banking_risk/silver/)               │    │
+  │  │  • Drop nulls (Age, Income, LoanAmount, CreditScore, etc.)     │    │
+  │  │  • Remove duplicate LoanIDs                                     │    │
+  │  │  • Cast columns to proper data types                            │    │
+  │  │  • Standardize categorical columns (trim whitespace)            │    │
+  │  │  • Business rules: Age 18-100, CreditScore 300-850             │    │
+  │  │                     Income > 0, DTI 0-5                         │    │
+  │  │  • Store as Delta table: silver_loan_clean                      │    │
+  │  └─────────────────────────────┬───────────────────────────────────┘    │
+  │                                │                                         │
+  │                    ANALYTICS / RISK ENGINE                               │
+  │                                │                                         │
+  │  ┌─────────────────────────────▼───────────────────────────────────┐    │
+  │  │  GOLD LAYER  (dbfs:/delta/banking_risk/gold/)                   │    │
+  │  │                                                                  │    │
+  │  │  Risk Score Formula (0–100):                                    │    │
+  │  │  ┌──────────────────────────────────────────────┐               │    │
+  │  │  │  (1 - CreditScore_norm) × 30  [Low CS=Risk]  │               │    │
+  │  │  │+ (1 - Income_norm)      × 20  [Low Inc=Risk]  │               │    │
+  │  │  │+ LoanAmount_norm        × 15  [High Loan=Risk] │              │    │
+  │  │  │+ DTIRatio_norm          × 20  [High DTI=Risk]  │              │    │
+  │  │  │+ InterestRate_norm      × 10  [High IR=Risk]   │              │    │
+  │  │  │+ (1 - MonthsEmp_norm)   ×  5  [Short Emp=Risk] │              │    │
+  │  │  └──────────────────────────────────────────────┘               │    │
+  │  │                                                                  │    │
+  │  │  Risk Categories:                                               │    │
+  │  │    0–40  → Low Risk    (3,492 customers)                       │    │
+  │  │    41–70 → Medium Risk (14,132 customers)                      │    │
+  │  │    71–100→ High Risk   (2,475 customers)                       │    │
+  │  │                                                                  │    │
+  │  │  Gold Delta Tables:                                             │    │
+  │  │  ├── gold_customer_risk_score      (scored dataset)            │    │
+  │  │  ├── gold_kpi_summary              (daily KPIs)                │    │
+  │  │  ├── gold_loan_default_summary     (by loan purpose)           │    │
+  │  │  ├── gold_loan_purpose_risk        (purpose × risk)            │    │
+  │  │  ├── gold_employment_risk_summary  (by employment type)        │    │
+  │  │  ├── gold_credit_score_risk_summary (CS range × risk)         │    │
+  │  │  └── gold_financial_risk_summary   (financial KPIs × risk)    │    │
+  │  └─────────────────────────────────────────────────────────────────┘    │
+  └─────────────────────────────────────┬────────────────────────────────────┘
+                                        │
+                                        ▼
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  4. ANALYTICS STORAGE — MySQL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │                 MySQL  (banking_risk_analytics DB)                     │
+  │                                                                        │
+  │  ┌──────────────────────┐   ┌──────────────────────────────────────┐  │
+  │  │  kpi_summary         │   │  customer_risk_score                  │  │
+  │  │  (daily KPIs)        │   │  (full scored dataset)               │  │
+  │  └──────────────────────┘   └──────────────────────────────────────┘  │
+  │  ┌──────────────────────┐   ┌──────────────────────────────────────┐  │
+  │  │ loan_default_analytics│   │  loan_purpose_risk                   │  │
+  │  │  (by purpose)        │   │  (purpose × risk)                    │  │
+  │  └──────────────────────┘   └──────────────────────────────────────┘  │
+  │  ┌──────────────────────┐   ┌──────────────────────────────────────┐  │
+  │  │employment_risk_summary│   │  credit_score_risk_summary           │  │
+  │  │  (by employment)     │   │  (CS range × risk)                   │  │
+  │  └──────────────────────┘   └──────────────────────────────────────┘  │
+  │  ┌──────────────────────────────────────────────────────────────────┐  │
+  │  │  financial_risk_summary   (avg loan, rate, DTI by risk category) │  │
+  │  └──────────────────────────────────────────────────────────────────┘  │
+  └─────────────────────────────────────┬──────────────────────────────────┘
+                                        │
+                                        ▼
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  5. REPORTING LAYER — Power BI / Interactive HTML Dashboard
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │          Risk_Analytics_Banking_Dashboard                              │
+  │                                                                        │
+  │  PAGE 1: Executive Summary                                             │
+  │  ├── KPI Cards: Total Customers, Default Rate, Avg Loan, etc.         │
+  │  ├── Risk Category Distribution (Donut Chart)                         │
+  │  └── Default Rate Overview                                            │
+  │                                                                        │
+  │  PAGE 2: Loan Default Analytics                                        │
+  │  ├── Default Rate by Loan Purpose (Bar Chart)                         │
+  │  ├── Default Rate by Employment Type (Bar Chart)                      │
+  │  ├── Loan Amount vs Default (Box Plot)                                │
+  │  └── Interest Rate vs Default (Bar Chart)                             │
+  │                                                                        │
+  │  PAGE 3: Customer Risk Score                                           │
+  │  ├── Risk Category Distribution (Bar + Donut)                         │
+  │  ├── Top 10 High Risk Customers (Table)                               │
+  │  ├── Risk by Age Group (Heatmap)                                      │
+  │  └── Credit Score Range vs Risk (Grouped Bar)                         │
+  │                                                                        │
+  │  PAGE 4: Financial Risk Insights                                       │
+  │  ├── Avg Loan Amount by Risk Category (Bar)                           │
+  │  ├── Default Rate by Education (Bar)                                  │
+  │  ├── Default by Marital Status (Pie)                                  │
+  │  └── Mortgage & CoSigner Impact (Bar)                                 │
+  └────────────────────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TECHNOLOGY STACK SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ┌─────────────────────────────────────────────────────────┐
+  │  Component           │  Technology                      │
+  │  ─────────────────────────────────────────────────────  │
+  │  Orchestration       │  Apache Airflow 2.8              │
+  │  Big Data Engine     │  Apache Spark 3.5 (PySpark)     │
+  │  Notebook Platform   │  Databricks                      │
+  │  Storage Format      │  Delta Lake                      │
+  │  Architecture        │  Medallion (Bronze/Silver/Gold)  │
+  │  Analytics DB        │  MySQL 8.x                       │
+  │  BI / Reporting      │  Power BI / HTML Dashboard       │
+  │  Language            │  Python 3.11                     │
+  └─────────────────────────────────────────────────────────┘
+
+================================================================================
+  END OF ARCHITECTURE FLOWCHART
+================================================================================
